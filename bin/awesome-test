@@ -58,7 +58,7 @@ function xephyr_pid()
 [ $# -lt 1 ] && usage
 
 # If rc.lua.new is missing, make a default one.
-RC_LUA=~/.config/awesome/rc.lua.new
+RC_LUA=$(dirname $0)/rc.lua.test
 test -f $RC_LUA || /bin/cp /etc/xdg/awesome/rc.lua $RC_LUA
 
 # Just in case we're not running from /usr/bin
