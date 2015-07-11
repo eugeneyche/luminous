@@ -45,10 +45,17 @@ function custom:draw(wibox, cr, width, height)
 	cr:save()
 
 	cr:set_source(gears.color("#000000"))
-	cr:translate(200, 220)
-	cr:scale(1.0, 0.8)
-	cr:arc(0, 0, 50, 0, math.pi)
-	cr:stroke()
+	if self.happy then
+		cr:translate(200, 220)
+		cr:scale(1.0, 0.8)
+		cr:arc(0, 0, 50, 0, math.pi)
+		cr:stroke()
+	else
+		cr:translate(200, 270)
+		cr:scale(1.0, 0.8)
+		cr:arc(0, 0, 50, math.pi, 2 * math.pi)
+		cr:stroke()
+	end
 
 	cr:restore()
 
@@ -64,6 +71,23 @@ function custom.new_widget(args)
 	ret.draw = custom.draw
 	ret.fit = custom.fit
 	ret.visible = true
+	ret.happy = true
+	ret:connect_signal("mouse::enter", function(...)
+			ret.happy = false
+			ret:emit_signal("widget::updated")
+		end)
+	ret:connect_signal("mouse::leave", function(...)
+			ret.happy = true
+			ret:emit_signal("widget::updated")
+		end)
+	ret.widget_buttons = awful.button({ }, 1, function(geom)
+			for k, v in pairs(geom) do
+				naughty.notify({text=(tostring(k) .. ", " .. tostring(v))})
+			end
+		end, function(...)
+			naughty.notify({text="mouse release event"})
+		end)
+	
 	return ret
 end
 
