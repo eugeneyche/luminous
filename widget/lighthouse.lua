@@ -30,19 +30,23 @@ end
 
 function lighthouse.prompt_new()
 	local base = wibox.layout.align.horizontal()
-	local prompt = wibox.widget.textbox()
-	local input = wibox.widget.textbox()
-	prompt:set_text("lighthouse-- ")
-	base:set_left(prompt)
-	base:set_middle(input)
-    function base.grab()
+	base._prompt = wibox.widget.textbox()
+	base._input = wibox.widget.textbox()
+	base._prompt:set_text("-- ")
+	base:set_left(base._prompt)
+	base:set_middle(base._input)
+    function base:grab()
         grabber = keygrabber.run(function(mod, key, ev)
             if ev ~= "press" then return end
+            if key == "BackSpace" and string.len(self._input._layout.text) > 0 then
+
+                self._input:set_text(string.sub(self._input._layout.text,0, string.len(self._input._layout.text) - 1))
+            end
             if key == "Escape" then
                 keygrabber.stop(grabber)
             end
             if key:wlen() == 1 then
-                input:set_text(input._layout.text .. key)
+                self._input:set_text(self._input._layout.text .. key)
             end
         end)
     end
@@ -68,7 +72,6 @@ function lighthouse.new(args)
 	_lighthouse.x = 100
 	_lighthouse.y = 100
 	_lighthouse.width = 300
-	_lighthouse.height = 20 * 4 
 	local base = wibox.layout.fixed.vertical()
 	local widgets = {} 
     local prompt = lighthouse.prompt_new()
@@ -76,13 +79,16 @@ function lighthouse.new(args)
 	table.insert(widgets, lighthouse.item_new("lol"))
 	table.insert(widgets, lighthouse.item_new("get"))
 	table.insert(widgets, lighthouse.item_new("fucked"))
+    local total_height = 0
 	for i, item in pairs(widgets) do
 		local w, h = item:fit(100, 20)
         base:add(item)
-	end
+        total_height = total_height + h
+	end 
+    _lighthouse.height = total_height
 	_lighthouse:set_widget(base)
 	_lighthouse.visible = true
-    prompt.grab()
+    prompt:grab()
 	return _lighthouse
 end
 
