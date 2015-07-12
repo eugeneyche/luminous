@@ -10,15 +10,17 @@ local error = error
 local gears = require("gears")
 local wibox = require("wibox")
 local awful = require("awful")
+local naughty = require("naughty")
 local beautiful = require("beautiful")
 local math = require("math")
 
+local keygrabber = require("awful.keygrabber")
 
 local lighthouse = { mt = {} }
 
 function lighthouse.decorate(item)
     local wrapper  = wibox.layout.margin(item, 2, 2, 2, 2, "#ff0000")
-    for k, v in ipairs(item) do
+    for k, v in pairs(item) do
         if not wrapper[k] then
             wrapper[k] = v
         end
@@ -31,10 +33,19 @@ function lighthouse.prompt_new()
 	local prompt = wibox.widget.textbox()
 	local input = wibox.widget.textbox()
 	prompt:set_text("lighthouse-- ")
-	input:set_text("fuck you!")
-    input:set_align("LEFT")
 	base:set_left(prompt)
 	base:set_middle(input)
+    function base.grab()
+        grabber = keygrabber.run(function(mod, key, ev)
+            if ev ~= "press" then return end
+            if key == "Escape" then
+                keygrabber.stop(grabber)
+            end
+            if key:wlen() == 1 then
+                input:set_text(input._layout.text .. key)
+            end
+        end)
+    end
 	return lighthouse.decorate(base)
 end
 
@@ -60,16 +71,18 @@ function lighthouse.new(args)
 	_lighthouse.height = 20 * 4 
 	local base = wibox.layout.fixed.vertical()
 	local widgets = {} 
-	table.insert(widgets, lighthouse.prompt_new())
+    local prompt = lighthouse.prompt_new()
+	table.insert(widgets, prompt)
 	table.insert(widgets, lighthouse.item_new("lol"))
 	table.insert(widgets, lighthouse.item_new("get"))
 	table.insert(widgets, lighthouse.item_new("fucked"))
 	for i, item in pairs(widgets) do
 		local w, h = item:fit(100, 20)
-		base:add(item)
+        base:add(item)
 	end
 	_lighthouse:set_widget(base)
 	_lighthouse.visible = true
+    prompt.grab()
 	return _lighthouse
 end
 
