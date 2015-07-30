@@ -12,7 +12,7 @@ local naughty = require("naughty")
 
 local prompt = { mt = {} }
 
-function prompt:update(modifiers, key, event)
+function prompt:on_key(modifiers, key, event)
     -- check for press
     if event ~= 'press' then return end
     -- check for mod (will change later)
@@ -72,7 +72,7 @@ end
 function prompt:show()
     local prompt_markup = '<span fgcolor="#ffff00">>>> </span>'
     local cursor_char = '_'
-    function cursor_highlight(c)
+    local function cursor_highlight(c)
         return '<span fgcolor="#ff0000">' .. c .. '</span>'
     end
     local query_markup = ''
@@ -81,8 +81,12 @@ function prompt:show()
     end
     if self.cursor <= self.query:len() then
         
-        query_markup = query_markup .. cursor_highlight(
-                self.query:sub(self.cursor, self.cursor))
+        if self.query:sub(self.cursor, self.cursor) == ' ' then
+            query_markup = query_markup .. cursor_highlight(cursor_char)
+        else
+            query_markup = query_markup .. cursor_highlight(
+                    self.query:sub(self.cursor, self.cursor))
+        end
         if self.cursor < self.query:len() then
             query_markup = query_markup .. self.query:sub(self.cursor + 1)
         end
@@ -100,12 +104,13 @@ function prompt.new(...)
         query = "",
         cursor = 1,
         show = prompt.show,
-        update = prompt.update,
         -- widgets
         textbox = tb,
         widget = bgb,
         -- callbacks
-        query_change_callback = nil
+        query_change_callback = nil,
+        -- handlers
+        on_key = prompt.on_key
     }
 
     return prompt_

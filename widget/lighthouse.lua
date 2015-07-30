@@ -24,6 +24,18 @@ local lighthouse = { mt = {} }
 -- Updates what is currently displayed in the lighthouse 
 -- with the new user query
 
+function lighthouse.load_commands()
+    local commands = {}
+    c, err = io.popen('compgen -ca')
+    if c then 
+        for command in c:lines() do
+            table.insert(commands, command)
+        end
+        c:close()
+    end
+    return commands
+end
+
 function lighthouse:show()
     self.prompt:show()
     self.entry_list:show()
@@ -82,13 +94,16 @@ end
 
 function lighthouse:grab()
     self:show()
+    if self.grabber then
+        keygrabber.stop(self.grabber)
+    end
     self.grabber = keygrabber.run(
         function(modifiers, key, event)
-            self:update(modifiers, key, event)
+            self:on_key(modifiers, key, event)
         end)
 end
 
-function lighthouse:update(modifiers, key, event)
+function lighthouse:on_key(modifiers, key, event)
     if event ~= "press" then return end
     -- Convert index array to hash table
     local mod = {}
@@ -103,12 +118,35 @@ function lighthouse:update(modifiers, key, event)
     if (mod.Control and (key == "c" or key == "g"))
         or (not mod.Control and key == "Escape") then
         keygrabber.stop(self.grabber)
+        self.grabber = nil
         self.wibox.visible = false
     end
-    self.prompt:update(modifiers, key, event)
+    self.prompt:on_key(modifiers, key, event)
 end
 
--- Sepcifications
+function lighthouse.fuzzy_match(query, str)
+    local function match_highlight(c)
+        return '<span fgcolor="#00ffff">' .. c .. '</span>'
+    end
+    repr = ''
+    local qi = 1
+    for i=1,str:len() do
+        local char_at_i = str:sub(i, i)
+        if qi <= query:len() and query:sub(qi, qi) == char_at_i then
+            qi = qi + 1
+            repr = repr .. match_highlight(char_at_i)
+        else
+            repr = repr .. char_at_i
+        end
+    end
+    if qi > query:len() then
+        return repr
+    else
+        return nil
+    end
+end
+
+-- Specifications
 -- Will handle events that the prompt throws
 -- Will handle events that entries throw
 -- Will handle all key events (yay!)
@@ -125,14 +163,26 @@ function lighthouse.new(...)
         -- widgets
         wibox = lighthouse.new_wibox(),
         prompt = prompt(),
-        entry_list = entry_list()
-        --callbacks
+        entry_list = entry_list(),
+        all_commands = lighthouse.load_commands(),
+        -- callbacks
+        -- handlers
+        on_key = lighthouse.on_key
     }
     lighthouse_.prompt.query_change_callback = function(query)
-        lighthouse_.entry_list.entry_values = {}
-
-        for entry in string.gmatch(query, "%S+") do
-            table.insert(lighthouse_.entry_list.entry_values, entry)
+        if query:len() == 0 then
+            lighthouse_.entry_list:update_entries({})
+        else
+            local filtered_commands = {}
+            for _,command in ipairs(lighthouse_.all_commands) do
+                if query:len() <= command:len() then
+                    match = lighthouse.fuzzy_match(query, command)
+                    if match then
+                        table.insert(filtered_commands, match)
+                    end
+                end
+            end
+            lighthouse_.entry_list:update_entries(filtered_commands)
         end
         lighthouse_:show()
     end
