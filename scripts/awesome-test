@@ -1,0 +1,6 @@
+RC_LUA=~/.config/awesome/rc.test.lua
+test -f $RC_LUA || /bin/cp /etc/xdg/awesome/rc.lua $RC_LUA
+
+pidof Xephyr || { Xephyr -ac -br -noreset -resizeable -screen 800x600 :1 & }
+sleep 1
+DISPLAY=:1.0 awesome -c $RC_LUA
