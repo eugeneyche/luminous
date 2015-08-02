@@ -10,10 +10,15 @@ local theme = require('beautiful')
 local wibox = require ('wibox')
 local keygrabber = require('awful.keygrabber')
 
-local utils = require('luminous.utils')
+local proto = require('luminous.proto')
 
 local prompt = require('luminous.prompt')
 local entry_list = require('luminous.entry_list')
+
+local multiplex = require('luminous.generator.multiplex')
+local shell = require('luminous.generator.shell')
+local calc = require('luminous.generator.calc')
+
 
 local lighthouse = { mt = {} }
 
@@ -30,12 +35,19 @@ function lighthouse:new(...)
         border_width=1,
         border_color='#ff0000'
     })
+    self.generator = multiplex()
+    self.generator:add_mode('sh', shell())
+    self.generator:add_mode('calc', calc())
     self.wibox:set_widget(layout)
     self.prompt:on_query_change(function(...)
-        self:update_entry_list()
+        self:update_entries(...)
     end)
     self.entry_list:on_resize(function(...)
         self:resize()
+    end)
+
+    self.entry_list:on_hint_prompt(function(hint)
+        self:update_hint(hint)
     end)
 end
 
@@ -45,6 +57,13 @@ function lighthouse:show()
     self.entry_list:show()
     self:resize()
     self.wibox.visible = true
+end
+
+
+function lighthouse:hide()
+    self.prompt:reset()
+    self.entry_list:reset()
+    self.wibox.visible = false
 end
 
 
@@ -71,6 +90,7 @@ end
 
 function lighthouse:run()
     self:show()
+    self:update_entries()
     if self.grabber then
         keygrabber.stop(self.grabber)
     end
@@ -81,74 +101,94 @@ function lighthouse:run()
 end
 
 
+function lighthouse:stop()
+    keygrabber.stop(self.grabber)
+    self.grabber = nil
+    self:hide()
+end
+
+
 function lighthouse:on_key(modifiers, key, event)
     if event ~= 'press' then return end
     local mod = {}
-    for k, v in ipairs(modifiers) do mod[v] = true end
-    if (mod.Control and (key == 'c' or key == 'g')) or 
-            (not mod.Control and key == 'Escape') then
-        keygrabber.stop(self.grabber)
-        self.grabber = nil
-        self.wibox.visible = false
-    elseif key == 'Left' or 
-            (mod.Control and key == 'b') then
+    for _,v in ipairs(modifiers) do mod[v] = true end
+    if mod.Mod4 or mod.Mod2 then return end
+
+    if      (mod.Control and key == 'c') or 
+            (mod.Control and key == 'g') or 
+            (not mod.Control and key == 'Escape') 
+    then
+        self:stop()
+    end
+    if      (mod.Control and key == 'b') or
+            (not mod.Control and key == 'Left') 
+    then
         self.prompt:cursor_left()
-    elseif key == 'Right' or 
-            (mod.Control and key == 'f') then
+    end
+    if      (mod.Control and key == 'f') or
+            (not mod.Control and key == 'Right') 
+    then
         self.prompt:cursor_right()
-    elseif mod.Control and key == 'a' then
+    end
+    if mod.Control and key == 'a' then
         self.prompt:cursor_home()
-    elseif mod.Control and key == 'e' then
+    end
+    if mod.Control and key == 'e' then
         self.prompt:cursor_end()
-    elseif key == 'BackSpace' then
-        self.prompt:backspace()
-    elseif not mod.Control then
-        if key:wlen() == 1 then
-            self.prompt:type_key(key)
-        end
-    elseif mod.Control and key == 'j' then
+    end
+    if      (mod.Control and key == 'j') or 
+            (not mod.Control and not mod.Shift and key == 'Tab') 
+    then
         self.entry_list:cursor_down()
-    elseif mod.Control and key == 'k' then
+    end
+    if      (mod.Control and key == 'k') or
+            (not mod.Control and mod.Shift and key == 'Tab')
+    then
         self.entry_list:cursor_up()
     end
+    if not mod.Control and key == 'BackSpace' then
+        self.prompt:backspace()
+    end
+    if not mod.Control and key == 'Return' then
+        self:execute()
+    end
+    if not mod.Control and key:wlen() == 1 then
+        self.prompt:type_key(key)
+    end
 end
 
 
-function lighthouse:update_entry_list()
+function lighthouse:update_entries()
     local new_entries = {}
-    for token in string.gmatch(self.prompt.query, '[^%s]+') do
-        table.insert(new_entries, token)
-    end
-    self.entry_list:update_entries(new_entries)
-    self:show()
+    result = self.generator:get_entries(self.prompt.query)
+    self.entry_list:cursor_reset()
+    self.entry_list:update_entries(result)
+    self.entry_list:show()
 end
 
 
-function lighthouse.fuzzy_match(query, str)
-    local function match_highlight(c)
-        return '<span fgcolor="#00ffff">' .. c .. '</span>'
-    end
-    repr = ''
-    local qi = 1
-    for i=1,str:len() do
-        local char_at_i = str:sub(i, i)
-        if qi <= query:len() and query:sub(qi, qi) == char_at_i then
-            qi = qi + 1
-            repr = repr .. match_highlight(char_at_i)
-        else
-            repr = repr .. char_at_i
-        end
-    end
-    if qi > query:len() then
-        return repr
+function lighthouse:update_hint(hint)
+    if hint then
+        self.prompt:store_hint(hint)
     else
-        return nil
+        self.prompt:unstore_hint()
     end
+end
+
+
+function lighthouse:execute()
+    local current_entry = self.entry_list:current_entry()
+    if current_entry then
+        current_entry:execute()
+    else
+        self.generator:fallback_execute(self.prompt.query)
+    end
+    self:stop()
 end
 
 
 function lighthouse.mt:__call(...)
-    return utils.create(lighthouse, ...)
+    return proto.new(lighthouse, ...)
 end
 
 

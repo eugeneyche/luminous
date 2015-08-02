@@ -8,7 +8,7 @@ local awful = require("awful")
 local theme = require("beautiful")
 local wibox = require("wibox")
 
-local utils = require('luminous.utils')
+local proto = require('luminous.proto')
 
 
 local prompt = { mt = {} }
@@ -18,12 +18,19 @@ function prompt:new(...)
     local tb = wibox.widget.textbox()
     local m = wibox.layout.margin(tb, 4, 4, 4, 4)
     local bgb = wibox.widget.background(m)
-    self.query = ''
-    self.cursor = 1
     self.textbox = tb
     self.base = bgb
-    
+
+    self:reset()
+
     self.query_change_listeners = {}
+end
+
+
+function prompt:reset()
+    self.query = ''
+    self.cursor = 1
+    self.hint = nil
 end
 
 
@@ -34,32 +41,37 @@ end
 
 function prompt:emit_query_change()
     for _,callback in ipairs(self.query_change_listeners) do
-        callback()
+        callback(self.query)
     end
 end
 
 
 function prompt:cursor_left()
+    self:finalize_hint()
     self.cursor = math.max(1, self.cursor - 1)
     self:show()
 end
 
 function prompt:cursor_right()
+    self:finalize_hint()
     self.cursor = math.min(self.query:len() + 1, self.cursor + 1)
     self:show()
 end
 
 function prompt:cursor_home()
+    self:finalize_hint()
     self.cursor = 1
     self:show()
 end
 
 function prompt:cursor_end()
+    self:finalize_hint()
     self.cursor = self.query:len() + 1
     self:show()
 end
 
 function prompt:backspace()
+    self:finalize_hint()
     if self.cursor == 1 then return end
     local new_query = ''
     if self.cursor > 2 then
@@ -78,6 +90,7 @@ function prompt:backspace()
 end
 
 function prompt:type_key(key)
+    self:finalize_hint()
     local new_query = ''
     if self.cursor > 1 then
         new_query = self.query:sub(1, self.cursor - 1)
@@ -93,7 +106,34 @@ function prompt:type_key(key)
 end
 
 
+function prompt:store_hint(hint)
+    self.hint = hint
+    self:show()
+end
+
+
+function prompt:unstore_hint()
+    self.hint = nil
+    self:show()
+end
+
+
+function prompt:finalize_hint()
+    if self.hint then
+        self.query = self.hint
+        self.hint = nil
+        self:emit_query_change()
+        self:cursor_end()
+    end
+end
+
+
 function prompt:show()
+    if self.hint then
+        local prompt_markup = '<span fgcolor="#ff00ff">>>> </span>' .. self.hint
+        self.textbox:set_markup(prompt_markup)
+        return
+    end
     local prompt_markup = '<span fgcolor="#ffff00">>>> </span>'
     local cursor_char = '_'
     local function cursor_highlight(c)
@@ -121,7 +161,7 @@ end
 
 
 function prompt.mt:__call(...)
-    return utils.create(prompt, ...)
+    return proto.new(prompt, ...)
 end
 
 
