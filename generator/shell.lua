@@ -7,23 +7,21 @@ local generator = require('luminous.generator')
 local entry = require('luminous.entry')
 local fuzzy = require('luminous.fuzzy')
 
+local common = require('luminous.common')
+
 
 local shell = { mt = {} }
 local shell_entry = { mt = {} }
 
 
 function shell_entry:new(command_name, ...)
-    proto.super(entry, self, ...)
+    proto.super(common.text_entry, self, command_name, ...)
     self.command_name = command_name
-    self.textbox = wibox.widget.textbox(' ')
-    self.base = wibox.layout.margin(self.textbox, 4, 4, 4, 4)
-    self.score = nil
 end
 
 
-function shell_entry:adjust(query)
+function shell_entry:process(query)
     local is_match, score, _, _, last_match = fuzzy.match(self.command_name, query)
-    self.score = score
     if is_match then
         local widget_markup = ''
         if last_match > 0 then
@@ -36,16 +34,7 @@ function shell_entry:adjust(query)
         end
         self.textbox:set_markup(widget_markup)
     end
-end
-
-
-function shell_entry:get_score()
-    return self.score
-end
-
-
-function shell_entry:get_widget()
-    return self.base
+    return score
 end
 
 
@@ -83,8 +72,10 @@ end
 
 function shell:generate_entries(query)
     for _,entry in ipairs(self.entries) do
-        entry:adjust(query)
-        self:yield_entry(entry)
+        local score = entry:process(query)
+        if score then
+            self:yield_entry(entry, score)
+        end
     end
 end
 

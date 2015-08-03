@@ -124,7 +124,6 @@ function entry_list:show()
     local skipped_entries = page * entries_per_page
     local shown_entries = math.min(entries_per_page, 
         #self.entry_values - skipped_entries)
-    local resized = #self.entry_widgets ~= shown_entries 
     if #self.entry_widgets > shown_entries then
         self.layout:reset()
         self.entry_widgets = {}
@@ -150,10 +149,7 @@ function entry_list:show()
             entry:unhover()
         end
     end
-    if resized then
-        self:emit_resize()
-    end
-
+    self:emit_resize()
 end
     
 

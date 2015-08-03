@@ -10,8 +10,8 @@ function generator:new(...)
 end
 
 
-function generator:yield_entry(entry)
-    coroutine.yield(entry)
+function generator:yield_entry(entry, score)
+    coroutine.yield(entry, score)
 end
 
 
@@ -23,12 +23,11 @@ function generator:fallback_execute(query) end
 
 function generator:get_entries(query)
     local gen_entries = coroutine.wrap(self.generate_entries)
-    entry_heap = {}
+    local entry_heap = {}
     while true do
-        entry = gen_entries(self, query)
+        local entry, score = gen_entries(self, query)
         if not entry then break end
-        local score = entry:get_score()
-        if type(score) == 'number' then
+        if entry and type(score) == 'number' then
             heap.push(entry_heap, entry, score)
             if #entry_heap >= self.max_entries then break end
         end

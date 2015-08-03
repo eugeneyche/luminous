@@ -8,11 +8,6 @@ function entry:new()
 end
 
 
-function entry:get_score()
-    return nil
-end
-
-
 function entry:get_widget() 
     return nil
 end
